@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mystery Dumpling Roulette v1.0</title>
+    <title>Mystery Dumpling Roulette v1.1</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
         body { 
@@ -93,7 +93,7 @@
         window.voteStartEarly = voteStartEarly;
         window.chooseBasket = chooseBasket;
 
-        const GAME_VERSION = "dumpling_v1.0";
+        const GAME_VERSION = "dumpling_v1.1";
         let myId = "";
         let myUsername = "";
         let localInGame = false;
@@ -102,10 +102,25 @@
         let lobbyPlayers = {};
         let currentMatchState = {};
 
+        // Force Fullscreen API Engine activation
+        function triggerDeviceFullscreen() {
+            const docEl = document.documentElement;
+            if (docEl.requestFullscreen) {
+                docEl.requestFullscreen().catch(() => {});
+            } else if (docEl.webkitRequestFullscreen) { /* Safari Mobile */
+                docEl.webkitRequestFullscreen();
+            } else if (docEl.msRequestFullscreen) { /* IE/Edge */
+                docEl.msRequestFullscreen();
+            }
+        }
+
         async function joinLobby() {
             const input = document.getElementById('username-input').value.trim();
             if(!input) return alert("Please type your chef name!");
             myUsername = input;
+
+            // Trigger full-screen frame lock instantly on registration tap
+            triggerDeviceFullscreen();
 
             myId = "chef_" + Math.floor(Math.random() * 1000000);
             onDisconnect(ref(db, `dumpling_party/players/${myId}`)).remove();
@@ -183,7 +198,6 @@
         async function triggerGameStart() {
             const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
             
-            // Randomly map out traps hidden inside baskets
             let items = ["gold", "shrimp", "gold", "trap", "shrimp", "gold", "trap", "gold"];
             items.sort(() => Math.random() - 0.5);
 
@@ -265,11 +279,9 @@
 
             await set(ref(db, `dumpling_party/baskets/${basketKey}/opened`), true);
 
-            // Pass the turn table index to the next survivor
             const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
             let nextIndex = (currentMatchState.turnIndex + 1) % activeIds.length;
             
-            // Skip eliminated players automatically
             let loops = 0;
             while(lobbyPlayers[activeIds[nextIndex]]?.eliminated && loops < activeIds.length) {
                 nextIndex = (nextIndex + 1) % activeIds.length;
