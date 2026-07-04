@@ -3,73 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mystery Dumpling Roulette v1.1</title>
+    <title>Mystery Dumpling: Lazy Susan Edition v2.0</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
         body { 
-            background: #0d0d13; color: #fff; overflow: hidden; touch-action: none;
+            background: #0f0f16; color: #fff; overflow: hidden; touch-action: none;
             position: fixed; width: 100vw; height: 100vh; user-select: none;
         }
         #login-screen, #lobby-screen {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(13, 13, 19, 0.99); display: flex; flex-direction: column;
+            background: rgba(15, 15, 22, 0.99); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 10; padding: 20px;
         }
-        #lobby-screen { display: none; background: #14141f; }
+        #lobby-screen { display: none; background: #161626; }
         
         .panel-box {
-            background: #1f1f2e; padding: 25px; border-radius: 16px; border: 3px solid #ffaa00;
-            width: 100%; max-width: 420px; text-align: center; box-shadow: 0 0 25px rgba(255, 170, 0, 0.25);
+            background: #222235; padding: 25px; border-radius: 16px; border: 3px solid #ffcc00;
+            width: 100%; max-width: 440px; text-align: center; box-shadow: 0 0 30px rgba(255, 204, 0, 0.2);
         }
-        h1, h2 { color: #ffaa00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+        h1, h2 { color: #ffcc00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
         
+        .avatar-grid { display: flex; justify-content: center; gap: 12px; margin: 15px 0; }
+        .avatar-opt { 
+            font-size: 32px; padding: 8px; background: #161626; border: 2px solid #444463; 
+            border-radius: 12px; cursor: pointer; transition: 0.2s;
+        }
+        .avatar-opt.selected { border-color: #ffcc00; background: #ffcc0022; transform: scale(1.15); }
+
         input[type="text"] {
-            width: 100%; padding: 14px; background: #0d0d13; border: 2px solid #44445c;
-            color: #fff; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 15px 0;
+            width: 100%; padding: 14px; background: #0f0f16; border: 2px solid #444463;
+            color: #fff; border-radius: 8px; font-weight: bold; font-size: 16px; margin-bottom: 10px;
             text-align: center;
         }
-        input[type="text"]:focus { border-color: #ffaa00; outline: none; }
+        input[type="text"]:focus { border-color: #ffcc00; outline: none; }
         
         button {
             width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 15px;
             font-weight: bold; text-transform: uppercase; cursor: pointer; letter-spacing: 1px;
             transition: 0.2s; margin-top: 10px;
         }
-        .btn-primary { background: #ffaa00; color: #0d0d13; }
-        .btn-primary:hover { background: #ffbb33; }
-        .btn-vote { background: #2d2d44; color: #b5b5c3; border: 1px solid #44445c; padding: 10px; }
-        .btn-vote.active { background: #00ffaa; color: #0d0d13; border-color: #00ffaa; }
+        .btn-primary { background: #ffcc00; color: #0f0f16; }
+        .btn-primary:hover { background: #ffdd33; }
 
         #player-list {
-            background: #0d0d13; border: 1px solid #2d2d44; padding: 12px; border-radius: 8px;
-            text-align: left; max-height: 140px; overflow-y: auto; margin: 12px 0; font-size: 14px; color: #ffcc00;
+            background: #0f0f16; border: 1px solid #2d2d44; padding: 12px; border-radius: 8px;
+            text-align: left; max-height: 120px; overflow-y: auto; margin: 12px 0; font-size: 14px; color: #ffcc00;
         }
         
-        .timer-banner { font-size: 24px; font-weight: bold; color: #ff3366; margin: 10px 0; }
+        #game-arena { display: none; width: 100vw; height: 100vh; position: relative; padding: 15px; }
         
-        #game-arena { display: none; width: 100vw; height: 100vh; position: relative; padding: 20px; }
-        #turn-indicator { font-size: 22px; font-weight: bold; color: #ffaa00; text-align: center; margin-top: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        
-        #conveyor-belt {
-            display: flex; justify-content: center; gap: 15px; margin-top: 40px;
-            flex-wrap: wrap; width: 100%; max-width: 800px; margin-left: auto; margin-right: auto;
+        #status-hud { text-align: center; font-weight: bold; font-size: 15px; color: #ff3366; min-height: 40px; padding: 0 10px; }
+        #turn-indicator { font-size: 20px; font-weight: bold; color: #ffcc00; text-align: center; margin-bottom: 5px; }
+        #shot-timer { font-size: 28px; font-weight: bold; color: #ff3366; text-align: center; text-shadow: 0 0 10px rgba(255,51,102,0.3); }
+
+        /* Rotating Lazy Susan Arena */
+        #table-wrapper {
+            position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%);
+            width: 290px; height: 290px; background: #3d2b1f; border: 10px solid #5c3e2b;
+            border-radius: 50%; box-shadow: 0 12px 24px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.5);
+            transition: transform 1.2s cubic-bezier(0.1, 0.8, 0.3, 1);
         }
         .dumpling-basket {
-            width: 100px; height: 100px; background: #e6b87d; border: 4px dashed #8a5a36;
-            border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            font-size: 40px; cursor: pointer; transition: transform 0.2s, background 0.2s;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            position: absolute; width: 70px; height: 70px; background: #e6b87d; 
+            border: 3px dashed #8a5a36; border-radius: 50%; display: flex; 
+            justify-content: center; align-items: center; font-size: 30px; 
+            cursor: pointer; transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
         }
-        .dumpling-basket:hover { transform: scale(1.08); }
-        .dumpling-basket.opened { background: #444; border-style: solid; pointer-events: none; opacity: 0.4; }
+        .dumpling-basket.opened { background: #2a2a35; border-style: solid; opacity: 0.45; }
+        
+        /* Inventory Deck UI */
+        #inventory-deck {
+            position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; background: rgba(34,34,53,0.85); padding: 8px 15px;
+            border-radius: 20px; border: 1px solid #444463; pointer-events: auto;
+        }
+        .item-card {
+            padding: 6px 12px; background: #ffcc00; color: #0f0f16; font-size: 12px;
+            font-weight: bold; border-radius: 6px; cursor: pointer; border: 1px solid #fff;
+        }
 
         #scoreboard {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #1f1f2e; border: 2px solid #ffaa00; padding: 15px; border-radius: 12px;
-            width: 90%; max-width: 400px; font-size: 14px;
+            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+            background: #222235; border: 2px solid #ffcc00; padding: 12px; border-radius: 12px;
+            width: 92%; max-width: 400px; font-size: 13px; max-height: 150px; overflow-y: auto;
         }
-        .score-row { display: flex; justify-content: space-between; margin: 4px 0; }
-        .eliminated-tag { color: #ff3366; text-decoration: line-through; }
+        .score-row { display: flex; justify-content: space-between; margin: 3px 0; align-items: center; }
+        .eliminated-tag { color: #ff3366; text-decoration: line-through; opacity: 0.6; }
     </style>
 
     <script type="module">
@@ -90,36 +110,40 @@
         const db = getDatabase(app);
 
         window.joinLobby = joinLobby;
+        window.selectAvatar = selectAvatar;
         window.voteStartEarly = voteStartEarly;
         window.chooseBasket = chooseBasket;
+        window.usePowerUp = usePowerUp;
 
-        const GAME_VERSION = "dumpling_v1.1";
+        const GAME_VERSION = "dumpling_v2.0";
         let myId = "";
         let myUsername = "";
+        let selectedAvatar = "🐼";
         let localInGame = false;
         let isAlive = true;
 
         let lobbyPlayers = {};
         let currentMatchState = {};
+        let localInventory = [];
+        let timerCountdownLocal = null;
 
-        // Force Fullscreen API Engine activation
+        function selectAvatar(el, emo) {
+            document.querySelectorAll('.avatar-opt').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedAvatar = emo;
+        }
+
         function triggerDeviceFullscreen() {
             const docEl = document.documentElement;
-            if (docEl.requestFullscreen) {
-                docEl.requestFullscreen().catch(() => {});
-            } else if (docEl.webkitRequestFullscreen) { /* Safari Mobile */
-                docEl.webkitRequestFullscreen();
-            } else if (docEl.msRequestFullscreen) { /* IE/Edge */
-                docEl.msRequestFullscreen();
-            }
+            if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+            else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
         }
 
         async function joinLobby() {
             const input = document.getElementById('username-input').value.trim();
-            if(!input) return alert("Please type your chef name!");
+            if(!input) return alert("Please enter your chef name!");
             myUsername = input;
 
-            // Trigger full-screen frame lock instantly on registration tap
             triggerDeviceFullscreen();
 
             myId = "chef_" + Math.floor(Math.random() * 1000000);
@@ -131,14 +155,14 @@
             Object.keys(existing).forEach(id => { if(existing[id].version === GAME_VERSION) count++; });
 
             if(count === 0) {
-                await set(ref(db, 'dumpling_party/matchState'), { status: "waiting", turnIndex: 0, trackingReset: Date.now() });
+                await set(ref(db, 'dumpling_party/matchState'), { status: "waiting", turnIndex: 0, rotationDegrees: 0 });
             }
 
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('lobby-screen').style.display = 'flex';
 
             await set(ref(db, `dumpling_party/players/${myId}`), {
-                username: myUsername, version: GAME_VERSION, readyEarly: false, score: 0, eliminated: false, timestamp: Date.now()
+                username: myUsername, avatar: selectedAvatar, version: GAME_VERSION, readyEarly: false, score: 0, eliminated: false, shieldActive: false
             });
 
             setupLobbySync();
@@ -158,9 +182,7 @@
                     if(data[id].version !== GAME_VERSION) return;
                     count++;
                     if(data[id].readyEarly) readyCount++;
-                    
-                    let tag = data[id].readyEarly ? " [READY]" : "";
-                    listDiv.innerHTML += `• ${data[id].username} ${id === myId ? '(You)' : ''}${tag}<br>`;
+                    listDiv.innerHTML += `• ${data[id].avatar} ${data[id].username} ${id === myId ? '(You)' : ''}${data[id].readyEarly ? ' [READY]' : ''}<br>`;
                 });
 
                 document.getElementById('connected-count').innerText = count;
@@ -176,15 +198,13 @@
             onValue(ref(db, 'dumpling_party/matchState'), (snap) => {
                 currentMatchState = snap.val() || {};
                 
-                if(currentMatchState.status === "active" && !localInGame) {
-                    enterGameArena();
-                }
-                if(currentMatchState.status === "waiting" && localInGame) {
-                    exitToLobbyMenu();
-                }
+                if(currentMatchState.status === "active" && !localInGame) enterGameArena();
+                if(currentMatchState.status === "waiting" && localInGame) exitToLobbyMenu();
+                
                 if(localInGame) {
                     renderActiveTurnLayout();
                     syncBasketsDisplay();
+                    handleTurnTimerSync();
                 }
             });
         }
@@ -198,7 +218,8 @@
         async function triggerGameStart() {
             const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
             
-            let items = ["gold", "shrimp", "gold", "trap", "shrimp", "gold", "trap", "gold"];
+            // Generate pool with standard rewards, traps, and power-up cards
+            let items = ["gold", "shrimp", "trap", "item_shield", "gold", "item_swap", "trap", "item_glass"];
             items.sort(() => Math.random() - 0.5);
 
             let basketArray = {};
@@ -208,47 +229,83 @@
 
             await set(ref(db, 'dumpling_party/baskets'), basketArray);
             await set(ref(db, 'dumpling_party/matchState'), {
-                status: "active",
-                turnIndex: 0,
-                activeTurnId: activeIds[0],
-                announcement: "The feast begins! Pick a basket."
+                status: "active", turnIndex: 0, activeTurnId: activeIds[0],
+                announcement: "The feast begins! Spin the table and eat!", rotationDegrees: 0, timerExpires: Date.now() + 16000
             });
         }
 
         function enterGameArena() {
-            localInGame = true;
-            isAlive = true;
+            localInGame = true; isAlive = true; localInventory = [];
             document.getElementById('lobby-screen').style.display = 'none';
             document.getElementById('game-arena').style.display = 'block';
+            updateInventoryUI();
         }
 
         function renderActiveTurnLayout() {
             const indicator = document.getElementById('turn-indicator');
+            const wrapper = document.getElementById('table-wrapper');
+            
+            if(wrapper) {
+                wrapper.style.transform = `translate(-50%, -50%) rotate(${currentMatchState.rotationDegrees || 0}deg)`;
+            }
+
             if(currentMatchState.activeTurnId === myId) {
-                indicator.innerText = "⭐ YOUR TURN! Open a Mystery Dumpling!";
+                indicator.innerText = "⭐ YOUR TURN! Pick a dumpling!";
                 indicator.style.color = "#00ffaa";
             } else {
-                let chefName = lobbyPlayers[currentMatchState.activeTurnId]?.username || "Another Player";
-                indicator.innerText = `Waiting for ${chefName} to pick...`;
-                indicator.style.color = "#ffaa00";
+                let chefName = lobbyPlayers[currentMatchState.activeTurnId]?.username || "Chef";
+                indicator.innerText = `Waiting for ${chefName}...`;
+                indicator.style.color = "#ffcc00";
             }
             if(currentMatchState.announcement) {
                 document.getElementById('status-hud').innerText = currentMatchState.announcement;
             }
         }
 
+        function handleTurnTimerSync() {
+            if(timerCountdownLocal) clearInterval(timerCountdownLocal);
+            
+            timerCountdownLocal = setInterval(async () => {
+                let remaining = Math.max(0, Math.round((currentMatchState.timerExpires - Date.now()) / 1000));
+                document.getElementById('shot-timer').innerText = remaining;
+
+                // Auto-trigger if current player lets timer click down to zero
+                if(remaining <= 0 && currentMatchState.activeTurnId === myId && isAlive) {
+                    clearInterval(timerCountdownLocal);
+                    forceRandomSelection();
+                }
+            }, 500);
+        }
+
+        async function forceRandomSelection() {
+            const snap = await get(ref(db, 'dumpling_party/baskets'));
+            const data = snap.val() || {};
+            let closedKeys = Object.keys(data).filter(k => !data[k].opened);
+            if(closedKeys.length > 0) {
+                chooseBasket(closedKeys[Math.floor(Math.random() * closedKeys.length)]);
+            }
+        }
+
         function syncBasketsDisplay() {
             get(ref(db, 'dumpling_party/baskets')).then((snap) => {
                 const data = snap.val() || {};
-                const belt = document.getElementById('conveyor-belt');
-                belt.innerHTML = "";
+                const wrapper = document.getElementById('table-wrapper');
+                if(!wrapper) return;
+                wrapper.innerHTML = "";
 
-                Object.keys(data).forEach(key => {
+                const keys = Object.keys(data);
+                keys.forEach((key, index) => {
                     let opened = data[key].opened;
                     let displayIcon = opened ? (data[key].content === "trap" ? "🌶️" : "🥢") : "🥟";
-                    let classString = opened ? "dumpling-basket opened" : "dumpling-basket";
+                    
+                    // Arrange symmetrically in a circle around the Lazy Susan table
+                    let angle = (index / keys.length) * Math.PI * 2;
+                    let radius = 100;
+                    let x = 110 + Math.cos(angle) * radius;
+                    let y = 110 + Math.sin(angle) * radius;
 
-                    belt.innerHTML += `<div class="${classString}" onclick="chooseBasket('${key}')">${displayIcon}</div>`;
+                    let classString = opened ? "dumpling-basket opened" : "dumpling-basket";
+                    wrapper.innerHTML += `<div class="${classString}" style="left:${x}px; top:${y}px; transform: rotate(-${currentMatchState.rotationDegrees || 0}deg);" onclick="chooseBasket('${key}')">${displayIcon}</div>`;
                 });
             });
         }
@@ -264,21 +321,63 @@
             let note = "";
             
             if(type === "trap") {
-                isAlive = false;
-                note = `💥 ${myUsername} bit into the GHOST PEPPER DUMPLING and exploded!`;
-                await set(ref(db, `dumpling_party/players/${myId}/eliminated`), true);
+                if(lobbyPlayers[myId].shieldActive) {
+                    note = `🛡️ ${myUsername}'s Bamboo Shield shattered but saved their life!`;
+                    await set(ref(db, `dumpling_party/players/${myId}/shieldActive`), false);
+                } else {
+                    isAlive = false;
+                    note = `🌶️💥 ${myUsername} bit a Ghost Pepper and exploded!`;
+                    await set(ref(db, `dumpling_party/players/${myId}/eliminated`), true);
+                }
+            } else if(type.startsWith("item_")) {
+                let itemType = type.split("_")[1];
+                localInventory.push(itemType);
+                updateInventoryUI();
+                note = `🎁 ${myUsername} discovered a Rare item card!`;
             } else if(type === "shrimp") {
                 let score = (lobbyPlayers[myId].score || 0) + 25;
-                note = `🍤 Juicy Shrimp Imperial! +25 Points to ${myUsername}!`;
+                note = `🍤 Elite Shrimp Imperial! +25 Points to ${myUsername}!`;
                 await set(ref(db, `dumpling_party/players/${myId}/score`), score);
             } else {
                 let score = (lobbyPlayers[myId].score || 0) + 10;
-                note = `🥟 Premium Pork Dumpling! +10 Points to ${myUsername}.`;
+                note = `🥟 Tasty Pork Dumpling. +10 Points to ${myUsername}.`;
                 await set(ref(db, `dumpling_party/players/${myId}/score`), score);
             }
 
             await set(ref(db, `dumpling_party/baskets/${basketKey}/opened`), true);
+            passTurnSequence(note);
+        }
 
+        async function usePowerUp(item, index) {
+            if(currentMatchState.activeTurnId !== myId || !isAlive) return;
+            
+            localInventory.splice(index, 1);
+            updateInventoryUI();
+
+            let note = "";
+            if(item === "shield") {
+                await set(ref(db, `dumpling_party/players/${myId}/shieldActive`), true);
+                note = `🛡️ ${myUsername} activated a Bamboo Shield for protection!`;
+            } else if(item === "swap") {
+                // Find highest score in lobby to swap with
+                let bestScore = 0;
+                Object.keys(lobbyPlayers).forEach(id => {
+                    if(id !== myId && lobbyPlayers[id].score > bestScore) bestScore = lobbyPlayers[id].score;
+                });
+                let myCurrent = lobbyPlayers[myId].score || 0;
+                await set(ref(db, `dumpling_party/players/${myId}/score`), bestScore);
+                note = `🥢 ${myUsername} swapped scores and jumped to ${bestScore} pts!`;
+            } else if(item === "glass") {
+                const bSnap = await get(ref(db, 'dumpling_party/baskets'));
+                const bData = bSnap.val() || {};
+                let trapCount = Object.keys(bData).filter(k => !bData[k].opened && bData[k].content === "trap").length;
+                note = `🔍 Magnifying Glass reveals: There are ${trapCount} traps left on the table!`;
+            }
+
+            passTurnSequence(note);
+        }
+
+        async function passTurnSequence(customAnnouncement) {
             const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
             let nextIndex = (currentMatchState.turnIndex + 1) % activeIds.length;
             
@@ -291,15 +390,26 @@
             let survivors = activeIds.filter(id => !lobbyPlayers[id].eliminated);
             if(survivors.length <= 1 && activeIds.length > 1) {
                 let winnerName = lobbyPlayers[survivors[0]]?.username || "No one";
-                note = `👑 GAME OVER! ${winnerName} is the Ultimate Dumpling Survivor!`;
-                setTimeout(() => { triggerLobbyReturnSequence(); }, 5000);
+                customAnnouncement = `👑 MATCH OVER! ${winnerName} wins the table!`;
+                setTimeout(() => { set(ref(db, 'dumpling_party/matchState/status'), "waiting"); }, 5000);
             }
 
             await set(ref(db, 'dumpling_party/matchState'), {
                 status: "active",
                 turnIndex: nextIndex,
                 activeTurnId: activeIds[nextIndex],
-                announcement: note
+                announcement: customAnnouncement,
+                rotationDegrees: (currentMatchState.rotationDegrees || 0) + 45,
+                timerExpires: Date.now() + 16000
+            });
+        }
+
+        function updateInventoryUI() {
+            const deck = document.getElementById('inventory-deck');
+            deck.innerHTML = "";
+            localInventory.forEach((item, idx) => {
+                let label = item === "shield" ? "🛡️ Shield" : item === "swap" ? "🥢 Swap" : "🔍 Peek";
+                deck.innerHTML += `<div class="item-card" onclick="usePowerUp('${item}', ${idx})">${label}</div>`;
             });
         }
 
@@ -310,22 +420,19 @@
                 if(lobbyPlayers[id].version !== GAME_VERSION) return;
                 let item = lobbyPlayers[id];
                 let classLabel = item.eliminated ? "score-row eliminated-tag" : "score-row";
-                lines.innerHTML += `<div class="${classLabel}"><span>${item.username}</span><span>${item.score || 0} pts</span></div>`;
+                let shieldTag = item.shieldActive ? " 🛡️" : "";
+                lines.innerHTML += `<div class="${classLabel}"><span>${item.avatar} ${item.username}${shieldTag}</span><span>${item.score || 0} pts</span></div>`;
             });
         }
 
-        function triggerLobbyReturnSequence() {
-            set(ref(db, 'dumpling_party/matchState/status'), "waiting");
-        }
-
         function exitToLobbyMenu() {
-            localInGame = false;
+            localInGame = false; if(timerCountdownLocal) clearInterval(timerCountdownLocal);
             document.getElementById('game-arena').style.display = 'none';
             document.getElementById('lobby-screen').style.display = 'flex';
-            document.getElementById('btn-early').classList.remove('active');
             set(ref(db, `dumpling_party/players/${myId}/readyEarly`), false);
             set(ref(db, `dumpling_party/players/${myId}/eliminated`), false);
             set(ref(db, `dumpling_party/players/${myId}/score`), 0);
+            set(ref(db, `dumpling_party/players/${myId}/shieldActive`), false);
         }
     </script>
 </head>
@@ -333,31 +440,40 @@
 
     <div id="login-screen">
         <div class="panel-box">
-            <h1>🥟 Dumpling Party</h1>
-            <p style="color: #a2a2c2; font-size: 13px;">Mystery Dumpling Roulette Hub</p>
+            <h1>🥟 Dumpling Party 2.0</h1>
+            <p style="color: #a2a2c2; font-size: 13px; margin-bottom: 5px;">Pick Your Chef Character Avatar:</p>
+            <div class="avatar-grid">
+                <div class="avatar-opt selected" onclick="selectAvatar(this, '🐼')">🐼</div>
+                <div class="avatar-opt" onclick="selectAvatar(this, '🐱')">🐱</div>
+                <div class="avatar-opt" onclick="selectAvatar(this, '🦊')">🦊</div>
+                <div class="avatar-opt" onclick="selectAvatar(this, '🐷')">🐷</div>
+            </div>
             <input type="text" id="username-input" placeholder="Chef Handle Name" maxlength="12">
-            <button class="btn-primary" onclick="joinLobby()">Join Feast Table</button>
+            <button class="btn-primary" onclick="joinLobby()">Join Lazy Susan Table</button>
         </div>
     </div>
 
     <div id="lobby-screen">
         <div class="panel-box">
-            <h2>Waiting Lounge</h2>
-            <div class="timer-banner">Ready up to start eating!</div>
-            <p style="text-align: left; font-size: 12px; color: #a2a2c2; margin-bottom: 5px;">Chefs Connected (<span id="connected-count">0</span>):</p>
-            <div id="player-list">Syncing dim sum table slots...</div>
-            <button id="btn-early" class="btn-primary" onclick="voteStartEarly()" style="background: none; border: 2px solid #ffaa00; color:#ffaa00;">Vote Start Early (<span id="early-vote-count">0/0</span>)</button>
+            <h2>Waiting Room</h2>
+            <div style="font-size: 18px; color: #ffcc00; margin: 10px 0;">Ready up to spin the table!</div>
+            <p style="text-align: left; font-size: 12px; color: #a2a2c2; margin-bottom: 5px;">Table Members (<span id="connected-count">0</span>):</p>
+            <div id="player-list">Loading real-time table sync...</div>
+            <button id="btn-early" class="btn-primary" onclick="voteStartEarly()" style="background: none; border: 2px solid #ffcc00; color:#ffcc00;">Vote Start Early (<span id="early-vote-count">0/0</span>)</button>
         </div>
     </div>
 
     <div id="game-arena">
-        <div id="status-hud" style="text-align: center; font-weight: bold; font-size: 16px; color: #ff3366;">The feast begins! Pick a basket.</div>
-        <div id="turn-indicator">Waiting for turn sequence sync...</div>
+        <div id="status-hud">Preparing table deployment...</div>
+        <div id="turn-indicator">Syncing active turns...</div>
+        <div id="shot-timer">15</div>
         
-        <div id="conveyor-belt"></div>
+        <div id="table-wrapper"></div>
+
+        <div id="inventory-deck"></div>
 
         <div id="scoreboard">
-            <h3 style="color:#ffaa00; text-align:center; font-size:14px; text-transform:uppercase; margin-bottom:8px;">Live Score Table</h3>
+            <h3 style="color:#ffcc00; text-align:center; font-size:13px; text-transform:uppercase; margin-bottom:5px;">Table Leaderboard</h3>
             <div id="score-lines"></div>
         </div>
     </div>
