@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mystery Dumpling Roulette v1.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
+        body { 
+            background: #0d0d13; color: #fff; overflow: hidden; touch-action: none;
+            position: fixed; width: 100vw; height: 100vh; user-select: none;
+        }
+        #login-screen, #lobby-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(13, 13, 19, 0.99); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10; padding: 20px;
+        }
+        #lobby-screen { display: none; background: #14141f; }
+        
+        .panel-box {
+            background: #1f1f2e; padding: 25px; border-radius: 16px; border: 3px solid #ffaa00;
+            width: 100%; max-width: 420px; text-align: center; box-shadow: 0 0 25px rgba(255, 170, 0, 0.25);
+        }
+        h1, h2 { color: #ffaa00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+        
+        input[type="text"] {
+            width: 100%; padding: 14px; background: #0d0d13; border: 2px solid #44445c;
+            color: #fff; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 15px 0;
+            text-align: center;
+        }
+        input[type="text"]:focus { border-color: #ffaa00; outline: none; }
+        
+        button {
+            width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 15px;
+            font-weight: bold; text-transform: uppercase; cursor: pointer; letter-spacing: 1px;
+            transition: 0.2s; margin-top: 10px;
+        }
+        .btn-primary { background: #ffaa00; color: #0d0d13; }
+        .btn-primary:hover { background: #ffbb33; }
+        .btn-vote { background: #2d2d44; color: #b5b5c3; border: 1px solid #44445c; padding: 10px; }
+        .btn-vote.active { background: #00ffaa; color: #0d0d13; border-color: #00ffaa; }
+
+        #player-list {
+            background: #0d0d13; border: 1px solid #2d2d44; padding: 12px; border-radius: 8px;
+            text-align: left; max-height: 140px; overflow-y: auto; margin: 12px 0; font-size: 14px; color: #ffcc00;
+        }
+        
+        .timer-banner { font-size: 24px; font-weight: bold; color: #ff3366; margin: 10px 0; }
+        
+        #game-arena { display: none; width: 100vw; height: 100vh; position: relative; padding: 20px; }
+        #turn-indicator { font-size: 22px; font-weight: bold; color: #ffaa00; text-align: center; margin-top: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        #conveyor-belt {
+            display: flex; justify-content: center; gap: 15px; margin-top: 40px;
+            flex-wrap: wrap; width: 100%; max-width: 800px; margin-left: auto; margin-right: auto;
+        }
+        .dumpling-basket {
+            width: 100px; height: 100px; background: #e6b87d; border: 4px dashed #8a5a36;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 40px; cursor: pointer; transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        .dumpling-basket:hover { transform: scale(1.08); }
+        .dumpling-basket.opened { background: #444; border-style: solid; pointer-events: none; opacity: 0.4; }
+
+        #scoreboard {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #1f1f2e; border: 2px solid #ffaa00; padding: 15px; border-radius: 12px;
+            width: 90%; max-width: 400px; font-size: 14px;
+        }
+        .score-row { display: flex; justify-content: space-between; margin: 4px 0; }
+        .eliminated-tag { color: #ff3366; text-decoration: line-through; }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwqLbtreU9DGCdT-3z7TgdTE-NK68hzCo",
+            authDomain: "summer-headhunt-game.firebaseapp.com",
+            projectId: "summer-headhunt-game",
+            storageBucket: "summer-headhunt-game.firebasestorage.app",
+            messagingSenderId: "274788013116",
+            appId: "1:274788013116:web:3673d50a5f555ee2fb5f39",
+            databaseURL: "https://summer-headhunt-game-default-rtdb.firebaseio.com/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.joinLobby = joinLobby;
+        window.voteStartEarly = voteStartEarly;
+        window.chooseBasket = chooseBasket;
+
+        const GAME_VERSION = "dumpling_v1.0";
+        let myId = "";
+        let myUsername = "";
+        let localInGame = false;
+        let isAlive = true;
+
+        let lobbyPlayers = {};
+        let currentMatchState = {};
+
+        async function joinLobby() {
+            const input = document.getElementById('username-input').value.trim();
+            if(!input) return alert("Please type your chef name!");
+            myUsername = input;
+
+            myId = "chef_" + Math.floor(Math.random() * 1000000);
+            onDisconnect(ref(db, `dumpling_party/players/${myId}`)).remove();
+
+            const playersSnap = await get(ref(db, 'dumpling_party/players'));
+            const existing = playersSnap.val() || {};
+            let count = 0;
+            Object.keys(existing).forEach(id => { if(existing[id].version === GAME_VERSION) count++; });
+
+            if(count === 0) {
+                await set(ref(db, 'dumpling_party/matchState'), { status: "waiting", turnIndex: 0, trackingReset: Date.now() });
+            }
+
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('lobby-screen').style.display = 'flex';
+
+            await set(ref(db, `dumpling_party/players/${myId}`), {
+                username: myUsername, version: GAME_VERSION, readyEarly: false, score: 0, eliminated: false, timestamp: Date.now()
+            });
+
+            setupLobbySync();
+        }
+
+        function setupLobbySync() {
+            onValue(ref(db, 'dumpling_party/players'), (snap) => {
+                const data = snap.val() || {};
+                lobbyPlayers = data;
+
+                let count = 0;
+                let readyCount = 0;
+                const listDiv = document.getElementById('player-list');
+                listDiv.innerHTML = "";
+
+                Object.keys(data).forEach(id => {
+                    if(data[id].version !== GAME_VERSION) return;
+                    count++;
+                    if(data[id].readyEarly) readyCount++;
+                    
+                    let tag = data[id].readyEarly ? " [READY]" : "";
+                    listDiv.innerHTML += `• ${data[id].username} ${id === myId ? '(You)' : ''}${tag}<br>`;
+                });
+
+                document.getElementById('connected-count').innerText = count;
+                document.getElementById('early-vote-count').innerText = `${readyCount}/${count}`;
+
+                if(readyCount >= count && count > 0 && currentMatchState.status === "waiting") {
+                    triggerGameStart();
+                }
+
+                if(localInGame) updateScoreboardUI();
+            });
+
+            onValue(ref(db, 'dumpling_party/matchState'), (snap) => {
+                currentMatchState = snap.val() || {};
+                
+                if(currentMatchState.status === "active" && !localInGame) {
+                    enterGameArena();
+                }
+                if(currentMatchState.status === "waiting" && localInGame) {
+                    exitToLobbyMenu();
+                }
+                if(localInGame) {
+                    renderActiveTurnLayout();
+                    syncBasketsDisplay();
+                }
+            });
+        }
+
+        async function voteStartEarly() {
+            const current = lobbyPlayers[myId]?.readyEarly || false;
+            document.getElementById('btn-early').classList.toggle('active', !current);
+            await set(ref(db, `dumpling_party/players/${myId}/readyEarly`), !current);
+        }
+
+        async function triggerGameStart() {
+            const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
+            
+            // Randomly map out traps hidden inside baskets
+            let items = ["gold", "shrimp", "gold", "trap", "shrimp", "gold", "trap", "gold"];
+            items.sort(() => Math.random() - 0.5);
+
+            let basketArray = {};
+            items.forEach((type, index) => {
+                basketArray[`basket_${index}`] = { opened: false, content: type };
+            });
+
+            await set(ref(db, 'dumpling_party/baskets'), basketArray);
+            await set(ref(db, 'dumpling_party/matchState'), {
+                status: "active",
+                turnIndex: 0,
+                activeTurnId: activeIds[0],
+                announcement: "The feast begins! Pick a basket."
+            });
+        }
+
+        function enterGameArena() {
+            localInGame = true;
+            isAlive = true;
+            document.getElementById('lobby-screen').style.display = 'none';
+            document.getElementById('game-arena').style.display = 'block';
+        }
+
+        function renderActiveTurnLayout() {
+            const indicator = document.getElementById('turn-indicator');
+            if(currentMatchState.activeTurnId === myId) {
+                indicator.innerText = "⭐ YOUR TURN! Open a Mystery Dumpling!";
+                indicator.style.color = "#00ffaa";
+            } else {
+                let chefName = lobbyPlayers[currentMatchState.activeTurnId]?.username || "Another Player";
+                indicator.innerText = `Waiting for ${chefName} to pick...`;
+                indicator.style.color = "#ffaa00";
+            }
+            if(currentMatchState.announcement) {
+                document.getElementById('status-hud').innerText = currentMatchState.announcement;
+            }
+        }
+
+        function syncBasketsDisplay() {
+            get(ref(db, 'dumpling_party/baskets')).then((snap) => {
+                const data = snap.val() || {};
+                const belt = document.getElementById('conveyor-belt');
+                belt.innerHTML = "";
+
+                Object.keys(data).forEach(key => {
+                    let opened = data[key].opened;
+                    let displayIcon = opened ? (data[key].content === "trap" ? "🌶️" : "🥢") : "🥟";
+                    let classString = opened ? "dumpling-basket opened" : "dumpling-basket";
+
+                    belt.innerHTML += `<div class="${classString}" onclick="chooseBasket('${key}')">${displayIcon}</div>`;
+                });
+            });
+        }
+
+        async function chooseBasket(basketKey) {
+            if(currentMatchState.activeTurnId !== myId || !isAlive) return;
+
+            const basketSnap = await get(ref(db, `dumpling_party/baskets/${basketKey}`));
+            const basket = basketSnap.val();
+            if(basket.opened) return;
+
+            let type = basket.content;
+            let note = "";
+            
+            if(type === "trap") {
+                isAlive = false;
+                note = `💥 ${myUsername} bit into the GHOST PEPPER DUMPLING and exploded!`;
+                await set(ref(db, `dumpling_party/players/${myId}/eliminated`), true);
+            } else if(type === "shrimp") {
+                let score = (lobbyPlayers[myId].score || 0) + 25;
+                note = `🍤 Juicy Shrimp Imperial! +25 Points to ${myUsername}!`;
+                await set(ref(db, `dumpling_party/players/${myId}/score`), score);
+            } else {
+                let score = (lobbyPlayers[myId].score || 0) + 10;
+                note = `🥟 Premium Pork Dumpling! +10 Points to ${myUsername}.`;
+                await set(ref(db, `dumpling_party/players/${myId}/score`), score);
+            }
+
+            await set(ref(db, `dumpling_party/baskets/${basketKey}/opened`), true);
+
+            // Pass the turn table index to the next survivor
+            const activeIds = Object.keys(lobbyPlayers).filter(id => lobbyPlayers[id].version === GAME_VERSION).sort();
+            let nextIndex = (currentMatchState.turnIndex + 1) % activeIds.length;
+            
+            // Skip eliminated players automatically
+            let loops = 0;
+            while(lobbyPlayers[activeIds[nextIndex]]?.eliminated && loops < activeIds.length) {
+                nextIndex = (nextIndex + 1) % activeIds.length;
+                loops++;
+            }
+
+            let survivors = activeIds.filter(id => !lobbyPlayers[id].eliminated);
+            if(survivors.length <= 1 && activeIds.length > 1) {
+                let winnerName = lobbyPlayers[survivors[0]]?.username || "No one";
+                note = `👑 GAME OVER! ${winnerName} is the Ultimate Dumpling Survivor!`;
+                setTimeout(() => { triggerLobbyReturnSequence(); }, 5000);
+            }
+
+            await set(ref(db, 'dumpling_party/matchState'), {
+                status: "active",
+                turnIndex: nextIndex,
+                activeTurnId: activeIds[nextIndex],
+                announcement: note
+            });
+        }
+
+        function updateScoreboardUI() {
+            const lines = document.getElementById('score-lines');
+            lines.innerHTML = "";
+            Object.keys(lobbyPlayers).forEach(id => {
+                if(lobbyPlayers[id].version !== GAME_VERSION) return;
+                let item = lobbyPlayers[id];
+                let classLabel = item.eliminated ? "score-row eliminated-tag" : "score-row";
+                lines.innerHTML += `<div class="${classLabel}"><span>${item.username}</span><span>${item.score || 0} pts</span></div>`;
+            });
+        }
+
+        function triggerLobbyReturnSequence() {
+            set(ref(db, 'dumpling_party/matchState/status'), "waiting");
+        }
+
+        function exitToLobbyMenu() {
+            localInGame = false;
+            document.getElementById('game-arena').style.display = 'none';
+            document.getElementById('lobby-screen').style.display = 'flex';
+            document.getElementById('btn-early').classList.remove('active');
+            set(ref(db, `dumpling_party/players/${myId}/readyEarly`), false);
+            set(ref(db, `dumpling_party/players/${myId}/eliminated`), false);
+            set(ref(db, `dumpling_party/players/${myId}/score`), 0);
+        }
+    </script>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="panel-box">
+            <h1>🥟 Dumpling Party</h1>
+            <p style="color: #a2a2c2; font-size: 13px;">Mystery Dumpling Roulette Hub</p>
+            <input type="text" id="username-input" placeholder="Chef Handle Name" maxlength="12">
+            <button class="btn-primary" onclick="joinLobby()">Join Feast Table</button>
+        </div>
+    </div>
+
+    <div id="lobby-screen">
+        <div class="panel-box">
+            <h2>Waiting Lounge</h2>
+            <div class="timer-banner">Ready up to start eating!</div>
+            <p style="text-align: left; font-size: 12px; color: #a2a2c2; margin-bottom: 5px;">Chefs Connected (<span id="connected-count">0</span>):</p>
+            <div id="player-list">Syncing dim sum table slots...</div>
+            <button id="btn-early" class="btn-primary" onclick="voteStartEarly()" style="background: none; border: 2px solid #ffaa00; color:#ffaa00;">Vote Start Early (<span id="early-vote-count">0/0</span>)</button>
+        </div>
+    </div>
+
+    <div id="game-arena">
+        <div id="status-hud" style="text-align: center; font-weight: bold; font-size: 16px; color: #ff3366;">The feast begins! Pick a basket.</div>
+        <div id="turn-indicator">Waiting for turn sequence sync...</div>
+        
+        <div id="conveyor-belt"></div>
+
+        <div id="scoreboard">
+            <h3 style="color:#ffaa00; text-align:center; font-size:14px; text-transform:uppercase; margin-bottom:8px;">Live Score Table</h3>
+            <div id="score-lines"></div>
+        </div>
+    </div>
+
+</body>
+</html>
